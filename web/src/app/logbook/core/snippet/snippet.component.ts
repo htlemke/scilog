@@ -22,7 +22,7 @@ import { SnippetContentComponent } from './snippet-content/snippet-content.compo
 import { UserPreferencesService } from '@shared/user-preferences.service';
 import { SnippetDashboardNameComponent } from './snippet-dashboard-name/snippet-dashboard-name.component';
 import { SnippetInfoComponent } from './snippet-info/snippet-info.component';
-import { LogbookItemDataService } from '@shared/remote-data.service';
+import { EVERYONE_LOGGED_IN, LogbookItemDataService } from '@shared/remote-data.service';
 import { trigger, state, style, transition, animate } from '@angular/animations';
 import { WidgetItemConfig } from '@model/config';
 import { Edits } from 'src/app/core/model/edits';
@@ -142,6 +142,50 @@ export class SnippetComponent implements OnInit, AfterContentInit, AfterViewChec
   /** The address of this entry on a page of its own, for sharing it. */
   get entryLink(): string {
     return new URL(`entries/${this.snippet.id}`, document.baseURI).href;
+  }
+
+  /** Everyone logged in to SciLog may read this entry, not only the logbook's readers. */
+  get sharedWithEveryone(): boolean {
+    return (this.snippet?.readACL ?? []).includes(EVERYONE_LOGGED_IN);
+  }
+
+  /** Sharing changes who may read, which SciLog allows to whoever may edit the entry, at any age. */
+  get canShare(): boolean {
+    return this.isActionAllowed.isMemberOf('update');
+  }
+
+  async setSharing(share: boolean) {
+    try {
+      this.snippet.readACL = await this.logbookItemDataService.shareWithEveryone(
+        this.snippet.id,
+        share,
+      );
+    } catch {
+      this.snackBar.open(`The entry could not be ${share ? 'shared' : 'unshared'}`, 'Dismiss', {
+        duration: 6000,
+      });
+      return;
+    }
+    if (!share) {
+      this.snackBar.open("Only the logbook's readers can read this entry again", 'Dismiss', {
+        duration: 4000,
+      });
+      return;
+    }
+    let copied = true;
+    try {
+      await navigator.clipboard.writeText(this.entryLink);
+    } catch {
+      copied = false;
+    }
+    this.snackBar
+      .open(
+        `Everyone logged in to SciLog can read this entry now${copied ? '; link copied' : ''}`,
+        'Undo',
+        { duration: 8000 },
+      )
+      .onAction()
+      .subscribe(() => this.setSharing(false));
   }
 
   async copyLink() {

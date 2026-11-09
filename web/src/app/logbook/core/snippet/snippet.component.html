@@ -7,6 +7,12 @@
 >
   <!-- [ngStyle]="{'border':isSelected ? '2px solid #26677a' : '2px solid #ffffff' }"> -->
   <mat-icon class="mat-fab-top-right-star" *ngIf="isHighlighted">star</mat-icon>
+  <mat-icon
+    class="entry-shared"
+    *ngIf="sharedWithEveryone"
+    matTooltip="Everyone logged in to SciLog can read this entry"
+    >public</mat-icon
+  >
   <!-- <mat-icon class="mat-fab-top-right-user" *ngIf="!enableEdit" matTooltip="Another user is currently editing this snippet.">account_circle</mat-icon> -->
   <svg
     class="mat-fab-top-right-user"
@@ -59,6 +65,17 @@
       <button mat-menu-item (click)="copyLink()" class="copy-link">
         <mat-icon>link</mat-icon>
         <span>Copy link</span>
+      </button>
+      <button
+        mat-menu-item
+        (click)="setSharing(!sharedWithEveryone)"
+        *ngIf="canShare"
+        class="share-everyone"
+      >
+        <mat-icon>{{ sharedWithEveryone ? 'public_off' : 'public' }}</mat-icon>
+        <span>{{
+          sharedWithEveryone ? 'Stop sharing with everyone' : 'Share with everyone logged in'
+        }}</span>
       </button>
       <!-- <button mat-menu-item disabled> -->
       <button

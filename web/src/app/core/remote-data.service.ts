@@ -19,6 +19,9 @@ interface Count {
   count: number;
 }
 
+/** The group every logged-in user is in: in a readACL, it makes something readable by all of them. */
+export const EVERYONE_LOGGED_IN = 'any-authenticated-user';
+
 @Injectable({
   providedIn: 'root',
 })
@@ -230,6 +233,45 @@ export class LogbookItemDataService extends RemoteDataService {
     // let headers = new HttpHeaders();
     // headers = headers.set('Accept', 'application/json');
     return this.getSnippets<Blob>('images/' + id, { responseType: 'blob' }).toPromise();
+  }
+
+  /**
+   * Makes an entry readable by everyone logged in to SciLog, or undoes that,
+   * together with the files it shows and its comments. Sharing changes the
+   * entry last and unsharing changes it first, so that a refusal on the way
+   * never leaves the entry readable by everyone while its files are not.
+   * Returns the entry's new readACL.
+   */
+  async shareWithEveryone(entryId: string, share: boolean): Promise<string[]> {
+    const entry = (await this.getBasesnippet(entryId)) as Basesnippets & { readACL?: string[] };
+    const setEntry = () =>
+      this.setReadableByEveryone('basesnippets', entry.id, entry.readACL, share);
+    const readACL = share ? null : await setEntry();
+    const children = (entry.subsnippets ?? []).filter((s) => s.snippetType === 'paragraph');
+    for (const child of children as (Basesnippets & { readACL?: string[] })[]) {
+      await this.setReadableByEveryone('basesnippets', child.id, child.readACL, share);
+    }
+    const fileIds = [...new Set((entry.files ?? []).map((f) => f.fileId).filter(Boolean))];
+    for (const id of fileIds) {
+      const file = (await this.getFilesnippet(id)) as Filesnippet & { readACL?: string[] };
+      await this.setReadableByEveryone('filesnippet', id, file.readACL, share);
+    }
+    return readACL ?? setEntry();
+  }
+
+  private async setReadableByEveryone(
+    path: string,
+    id: string,
+    readACL: string[] = [],
+    share: boolean,
+  ): Promise<string[]> {
+    const next = share
+      ? [...new Set([...readACL, EVERYONE_LOGGED_IN])]
+      : readACL.filter((group) => group !== EVERYONE_LOGGED_IN);
+    if (next.length === readACL.length) return readACL;
+    const headers = new HttpHeaders().set('Content-Type', 'application/json; charset=utf-8');
+    await this.patchSnippet(path, id, JSON.stringify({ readACL: next }), headers).toPromise();
+    return next;
   }
 
   getFilesnippet(id: string) {

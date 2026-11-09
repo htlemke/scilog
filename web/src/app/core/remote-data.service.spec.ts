@@ -4,6 +4,7 @@ import { RemoteDataService } from '@shared/remote-data.service';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { AppConfigService } from '../app-config.service';
 import {
+  EVERYONE_LOGGED_IN,
   LogbookDataService,
   LogbookItemDataService,
   SearchDataService,
@@ -372,6 +373,101 @@ describe('LogbookDataService', () => {
     expect((req.request.body as FormData).get('file')).toBe(file);
     req.flush({ id: 'lb1' });
     httpTestingController.verify();
+  });
+});
+
+describe('LogbookItemDataService.shareWithEveryone', () => {
+  const base = 'http://[::1]:3000/';
+  let service: LogbookItemDataService;
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: AppConfigService, useValue: { getConfig } },
+        provideHttpClient(withInterceptorsFromDi()),
+        provideHttpClientTesting(),
+      ],
+    });
+    service = TestBed.inject(LogbookItemDataService);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => http.verify());
+
+  // the next request, once the service has sent it
+  async function next(method: string, path: string) {
+    for (let i = 0; i < 20; i++) {
+      const found = http.match((r) => r.method === method && r.url === base + path);
+      if (found.length) return found[0];
+      await new Promise((resolve) => setTimeout(resolve));
+    }
+    throw new Error(`no ${method} ${path}`);
+  }
+
+  const entry = {
+    id: 'e1',
+    snippetType: 'paragraph',
+    readACL: ['p1'],
+    files: [{ fileId: 'f1' }, { fileId: 'f1' }, { fileHash: 'no-id' }],
+    subsnippets: [
+      { id: 'c1', snippetType: 'paragraph', linkType: 'comment', readACL: ['p1'] },
+      {
+        id: 'c2',
+        snippetType: 'paragraph',
+        linkType: 'quote',
+        readACL: ['p1', EVERYONE_LOGGED_IN],
+      },
+      { id: 'h1', snippetType: 'edit' },
+    ],
+  };
+
+  it('shares the comments and files first and the entry last, each once', async () => {
+    const done = service.shareWithEveryone('e1', true);
+    (await next('GET', 'basesnippets/e1')).flush(entry);
+    const comment = await next('PATCH', 'basesnippets/c1');
+    expect(JSON.parse(comment.request.body)).toEqual({ readACL: ['p1', EVERYONE_LOGGED_IN] });
+    comment.flush(null);
+    // c2 is shared already, h1 is not an entry: neither is patched
+    (await next('GET', 'filesnippet/f1')).flush({ id: 'f1', readACL: ['p1'] });
+    const file = await next('PATCH', 'filesnippet/f1');
+    expect(JSON.parse(file.request.body)).toEqual({ readACL: ['p1', EVERYONE_LOGGED_IN] });
+    file.flush(null);
+    const own = await next('PATCH', 'basesnippets/e1');
+    expect(JSON.parse(own.request.body)).toEqual({ readACL: ['p1', EVERYONE_LOGGED_IN] });
+    own.flush(null);
+    expect(await done).toEqual(['p1', EVERYONE_LOGGED_IN]);
+  });
+
+  it('unshares the entry first, then its comments and files', async () => {
+    const done = service.shareWithEveryone('e1', false);
+    (await next('GET', 'basesnippets/e1')).flush({ ...entry, readACL: ['p1', EVERYONE_LOGGED_IN] });
+    const own = await next('PATCH', 'basesnippets/e1');
+    expect(JSON.parse(own.request.body)).toEqual({ readACL: ['p1'] });
+    own.flush(null);
+    const quote = await next('PATCH', 'basesnippets/c2');
+    expect(JSON.parse(quote.request.body)).toEqual({ readACL: ['p1'] });
+    quote.flush(null);
+    (await next('GET', 'filesnippet/f1')).flush({ id: 'f1', readACL: ['p1', EVERYONE_LOGGED_IN] });
+    const file = await next('PATCH', 'filesnippet/f1');
+    expect(JSON.parse(file.request.body)).toEqual({ readACL: ['p1'] });
+    file.flush(null);
+    expect(await done).toEqual(['p1']);
+  });
+
+  it('leaves the entry as it was when a file may not be changed', async () => {
+    const done = service.shareWithEveryone('e1', true);
+    (await next('GET', 'basesnippets/e1')).flush(entry);
+    (await next('PATCH', 'basesnippets/c1')).flush(null);
+    (await next('GET', 'filesnippet/f1')).flush({ id: 'f1', readACL: ['p1'] });
+    (await next('PATCH', 'filesnippet/f1')).flush(
+      { error: 'no' },
+      { status: 403, statusText: 'Forbidden' },
+    );
+    await expectAsync(done).toBeRejected();
+    expect(http.match((r) => r.method === 'PATCH' && r.url === base + 'basesnippets/e1')).toEqual(
+      [],
+    );
   });
 });
 
