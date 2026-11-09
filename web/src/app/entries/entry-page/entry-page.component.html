@@ -1,0 +1,49 @@
+<div class="entry-page">
+  <a mat-button routerLink="/overview" class="entry-page-back">
+    <mat-icon>arrow_back</mat-icon>
+    Logbooks
+  </a>
+
+  <p *ngIf="state === 'loading'" class="entry-page-note">Loading the entry …</p>
+
+  <p *ngIf="state === 'missing'" class="entry-page-note entry-page-missing">
+    This entry does not exist, or you may not read it.
+  </p>
+
+  <p *ngIf="state === 'failed'" class="entry-page-note entry-page-failed">
+    The entry could not be loaded. Please try again later.
+  </p>
+
+  <ng-container *ngIf="state === 'ready' && entry">
+    <mat-card appearance="raised" class="entry-page-card">
+      <mat-card-content>
+        <div class="entry-page-meta">
+          {{ entry.createdAt | date: 'medium' }} · {{ entry.createdBy }}
+        </div>
+        <blockquote *ngIf="quote" class="entry-page-quote">
+          <div class="entry-page-meta">In reply to</div>
+          <app-snippet-content [snippet]="quote"></app-snippet-content>
+        </blockquote>
+        <app-snippet-content [snippet]="entry"></app-snippet-content>
+        <div class="snippet-tags-container" *ngIf="entry.tags?.length">
+          <span class="snippet-tag" *ngFor="let tag of entry.tags">{{ tag }}</span>
+        </div>
+        <section *ngIf="comments.length" class="entry-page-comments">
+          <div *ngFor="let comment of comments" class="entry-page-comment">
+            <div class="entry-page-meta">
+              {{ comment.createdAt | date: 'medium' }} · {{ comment.createdBy }}
+            </div>
+            <app-snippet-content [snippet]="comment"></app-snippet-content>
+          </div>
+        </section>
+      </mat-card-content>
+    </mat-card>
+
+    <p class="entry-page-context">
+      <a *ngIf="logbook" [routerLink]="['/logbooks', logbook.id, 'dashboard']">
+        Open the logbook {{ logbook.name }}
+      </a>
+      <span *ngIf="!logbook">You may read this entry, but not the logbook it belongs to.</span>
+    </p>
+  </ng-container>
+</div>

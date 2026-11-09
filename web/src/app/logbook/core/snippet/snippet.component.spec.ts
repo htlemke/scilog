@@ -91,6 +91,21 @@ describe('SnippetComponent', () => {
     fixture.detectChanges();
   });
 
+  it('copies the link to the entry on a page of its own', async () => {
+    const write = spyOn(navigator.clipboard, 'writeText').and.resolveTo();
+    const open = spyOn(component['snackBar'], 'open');
+    await component.copyLink();
+    expect(write).toHaveBeenCalledWith(new URL(`entries/${snippetMock.id}`, document.baseURI).href);
+    expect(open).toHaveBeenCalledWith('Link to this entry copied', 'Dismiss', { duration: 3000 });
+  });
+
+  it('shows the link when it cannot be copied', async () => {
+    spyOn(navigator.clipboard, 'writeText').and.rejectWith(new Error('denied'));
+    const open = spyOn(component['snackBar'], 'open');
+    await component.copyLink();
+    expect(open.calls.mostRecent().args[0]).toContain(`/entries/${snippetMock.id}`);
+  });
+
   it('should create', () => {
     expect(component).toBeTruthy();
   });
