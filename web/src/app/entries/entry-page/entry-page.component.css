@@ -1,0 +1,54 @@
+.entry-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.entry-page-back {
+  margin-bottom: 12px;
+}
+
+.entry-page-note,
+.entry-page-context {
+  color: var(--secondary-text-color, #5f6672);
+}
+
+.entry-page-meta {
+  color: var(--secondary-text-color, #5f6672);
+  font-size: 0.85em;
+  margin-bottom: 8px;
+}
+
+/* tags as the logbook shows them */
+.snippet-tags-container {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+  opacity: 0.4;
+}
+
+.snippet-tag {
+  background-color: #e0e0e0;
+  color: rgba(0, 0, 0, 0.87);
+  border-radius: 5px;
+  padding: 2px;
+}
+
+/* a reply: what it answers, above it */
+.entry-page-quote {
+  margin: 0 0 12px;
+  padding: 4px 12px;
+  border-left: 3px solid var(--secondary-text-color, #5f6672);
+  opacity: 0.85;
+}
+
+/* comments: below the entry, marked as one thread */
+.entry-page-comments {
+  margin-top: 16px;
+  padding-left: 12px;
+  border-left: 2px solid var(--secondary-text-color, #5f6672);
+}
+
+.entry-page-comment + .entry-page-comment {
+  margin-top: 12px;
+}

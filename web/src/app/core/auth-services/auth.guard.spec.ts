@@ -28,6 +28,7 @@ describe('authGuard', () => {
       '/overview',
       '/logbooks/1/dashboard',
       '/download/1',
+      '/entries/1',
       '/overview(settings:viewSettings)',
       '/logbooks/1/dashboard(settings:viewSettings)',
       '/logbooks/1/dashboard(settings:profileSettings)',
@@ -53,6 +54,7 @@ describe('authGuard', () => {
 
     [
       '/logbooks/1/dashboard',
+      '/entries/1',
       '/overview(settings:viewSettings)',
       '/logbooks/1/dashboard(settings:viewSettings)',
       '/logbooks/1/dashboard(settings:profileSettings)',

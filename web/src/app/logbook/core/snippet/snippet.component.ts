@@ -35,6 +35,7 @@ import { NgxJdenticonModule } from 'ngx-jdenticon';
 import { MatTooltip } from '@angular/material/tooltip';
 import { MatIconButton } from '@angular/material/button';
 import { MatMenuTrigger, MatMenu, MatMenuItem } from '@angular/material/menu';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({
   selector: 'app-snippet',
@@ -135,7 +136,24 @@ export class SnippetComponent implements OnInit, AfterContentInit, AfterViewChec
     private logbookItemDataService: LogbookItemDataService,
     private userPreferences: UserPreferencesService,
     protected isActionAllowed: IsAllowedService,
+    private snackBar: MatSnackBar,
   ) {}
+
+  /** The address of this entry on a page of its own, for sharing it. */
+  get entryLink(): string {
+    return new URL(`entries/${this.snippet.id}`, document.baseURI).href;
+  }
+
+  async copyLink() {
+    try {
+      await navigator.clipboard.writeText(this.entryLink);
+      this.snackBar.open('Link to this entry copied', 'Dismiss', { duration: 3000 });
+    } catch {
+      this.snackBar.open(`The link could not be copied: ${this.entryLink}`, 'Dismiss', {
+        duration: 10000,
+      });
+    }
+  }
 
   ngOnInit(): void {
     if (this.snippet.isMessage) {
