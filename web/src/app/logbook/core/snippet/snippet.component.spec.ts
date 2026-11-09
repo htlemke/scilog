@@ -8,8 +8,8 @@ import {
 import { MatMenuModule } from '@angular/material/menu';
 import { SnippetComponent } from './snippet.component';
 import { Paragraphs, LinkType } from '@model/paragraphs';
-import { LogbookItemDataService } from '@shared/remote-data.service';
-import { of } from 'rxjs';
+import { EVERYONE_LOGGED_IN, LogbookItemDataService } from '@shared/remote-data.service';
+import { of, Subject } from 'rxjs';
 import { UserPreferencesService } from '@shared/user-preferences.service';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { WidgetItemConfig } from '@model/config';
@@ -25,6 +25,7 @@ describe('SnippetComponent', () => {
     'deleteLogbookItem',
     'getBasesnippet',
     'deleteAllInProgressEditing',
+    'shareWithEveryone',
   ]);
   logbookItemDataServiceSpy.deleteLogbookItem.and.returnValue(of({}));
   logbookItemDataServiceSpy.getBasesnippet.and.returnValue({
@@ -104,6 +105,63 @@ describe('SnippetComponent', () => {
     const open = spyOn(component['snackBar'], 'open');
     await component.copyLink();
     expect(open.calls.mostRecent().args[0]).toContain(`/entries/${snippetMock.id}`);
+  });
+
+  describe('sharing with everyone logged in', () => {
+    const shared = ['p17642', EVERYONE_LOGGED_IN];
+    let open: jasmine.Spy;
+    let undo: Subject<void>;
+
+    beforeEach(() => {
+      component.snippet = { ...snippetMock, readACL: ['p17642'] };
+      undo = new Subject<void>();
+      open = spyOn(component['snackBar'], 'open').and.returnValue({
+        onAction: () => undo,
+      } as any);
+      spyOn(navigator.clipboard, 'writeText').and.resolveTo();
+      logbookItemDataServiceSpy.shareWithEveryone.calls.reset();
+    });
+
+    it('tells whether the entry is shared', () => {
+      expect(component.sharedWithEveryone).toBeFalse();
+      component.snippet.readACL = shared;
+      expect(component.sharedWithEveryone).toBeTrue();
+    });
+
+    it('shares the entry, copies its link and offers to undo', async () => {
+      logbookItemDataServiceSpy.shareWithEveryone.and.resolveTo(shared);
+      await component.setSharing(true);
+      expect(logbookItemDataServiceSpy.shareWithEveryone).toHaveBeenCalledWith(
+        snippetMock.id,
+        true,
+      );
+      expect(component.snippet.readACL).toEqual(shared);
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(component.entryLink);
+      expect(open.calls.mostRecent().args[0]).toContain('link copied');
+      expect(open.calls.mostRecent().args[1]).toEqual('Undo');
+
+      logbookItemDataServiceSpy.shareWithEveryone.and.resolveTo(['p17642']);
+      undo.next();
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(logbookItemDataServiceSpy.shareWithEveryone).toHaveBeenCalledWith(
+        snippetMock.id,
+        false,
+      );
+      expect(component.snippet.readACL).toEqual(['p17642']);
+    });
+
+    it('asks who may share without changing what the edit item says', () => {
+      const tooltips = { ...component['isActionAllowed'].tooltips };
+      expect(typeof component.canShare).toBe('boolean');
+      expect(component['isActionAllowed'].tooltips).toEqual(tooltips);
+    });
+
+    it('says so and changes nothing when SciLog refuses', async () => {
+      logbookItemDataServiceSpy.shareWithEveryone.and.rejectWith({ status: 403 });
+      await component.setSharing(true);
+      expect(component.snippet.readACL).toEqual(['p17642']);
+      expect(open.calls.mostRecent().args[0]).toEqual('The entry could not be shared');
+    });
   });
 
   it('should create', () => {
